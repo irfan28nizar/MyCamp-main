@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyCamp Admin</title>
+  <style>
+    :root {
+      --primary: #1da0aa;
+      --primary-light: #39c3cf;
+      --bg: #f6f2fa;
+      --card: #ffffff;
+      --text: #1e1f22;
+      --muted: #6a7075;
+      --danger: #e53935;
+      --danger-light: #ffebee;
+      --success: #43a047;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .login-wrapper {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .login-card {
+      background: var(--card); border-radius: 20px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      padding: 40px; width: 100%; max-width: 400px;
+    }
+    .login-card h1 {
+      font-size: 24px; font-weight: 600; text-align: center; margin-bottom: 8px;
+    }
+    .login-card p { text-align: center; color: var(--muted); margin-bottom: 28px; font-size: 14px; }
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-weight: 500; margin-bottom: 6px; font-size: 14px; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 12px 14px; border: 1px solid #ddd;
+      border-radius: 12px; font-size: 15px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: var(--primary); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 24px; border: none; border-radius: 14px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: white; width: 100%;
+    }
+    .btn-danger { background: var(--danger-light); color: var(--danger); }
+    .btn-sm { padding: 8px 16px; font-size: 13px; border-radius: 10px; }
+
+    /* Dashboard */
+    .dashboard { display: none; }
+    .dashboard.active { display: block; }
+    .login-wrapper.hidden { display: none; }
+    .topbar {
+      background: var(--card); padding: 16px 28px;
+      display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+    }
+    .topbar h1 { font-size: 20px; }
+    .topbar .user-info { display: flex; align-items: center; gap: 12px; }
+    .topbar .user-email { font-size: 14px; color: var(--muted); }
+    .btn-logout { background: none; color: var(--danger); border: 1px solid var(--danger); }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 28px 20px; }
+    .section-title {
+      font-size: 22px; font-weight: 600; margin-bottom: 20px;
+    }
+
+    .card {
+      background: var(--card); border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.05); padding: 24px;
+      margin-bottom: 24px;
+    }
+    .card h2 { font-size: 18px; margin-bottom: 18px; }
+
+    .create-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .create-form .full-width { grid-column: 1 / -1; }
+    .create-form .span-2 { grid-column: span 2; }
+
+    .users-table { width: 100%; border-collapse: collapse; }
+    .users-table th, .users-table td {
+      text-align: left; padding: 14px 16px; border-bottom: 1px solid #eee;
+    }
+    .users-table th { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .users-table tr:last-child td { border-bottom: none; }
+    .role-badge {
+      display: inline-block; padding: 4px 10px; border-radius: 8px;
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+    }
+    .role-admin { background: #fff3e0; color: #e65100; }
+    .role-student { background: #e8f5e9; color: #2e7d32; }
+    .role-teacher { background: #f3e5f5; color: #7b1fa2; }
+    .role-temp { background: #e3f2fd; color: #1565c0; }
+
+    .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+    .search-filter-bar { display: flex; gap: 12px; margin-bottom: 18px; }
+    .search-filter-bar input { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; outline: none; }
+    .search-filter-bar input:focus { border-color: var(--primary); }
+    .search-filter-bar select { padding: 10px 14px; border: 1px solid #ddd; border-radius: 12px; font-size: 14px; outline: none; min-width: 140px; }
+    .search-filter-bar select:focus { border-color: var(--primary); }
+    .status-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+    .status-yes { background: #e8f5e9; color: #2e7d32; }
+    .status-no { background: #fff3e0; color: #e65100; }
+    .users-table { font-size: 13px; }
+    .users-table th { font-size: 11px; white-space: nowrap; }
+    .users-table td { font-size: 13px; }
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--text); color: white;
+      padding: 14px 24px; border-radius: 12px;
+      font-size: 14px; z-index: 1000;
+      animation: slideIn 0.3s ease;
+    }
+    .toast.error { background: var(--danger); }
+    .toast.success { background: var(--success); }
+    @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    @media (max-width: 900px) {
+      .create-form { grid-template-columns: 1fr 1fr; }
+      .search-filter-bar { flex-direction: column; }
+    }
+    @media (max-width: 600px) {
+      .create-form { grid-template-columns: 1fr; }
+      .create-form .span-2 { grid-column: span 1; }
+      .topbar { padding: 14px 16px; }
+      .container { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div class="login-wrapper" id="loginView">
+  <div class="login-card">
+    <h1>MyCamp Admin</h1>
+    <p>Sign in with your admin account</p>
+    <div class="form-group">
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" placeholder="admin@mycamp.app" />
+    </div>
+    <div class="form-group">
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" placeholder="Password" />
+    </div>
+    <button class="btn btn-primary" id="loginBtn" onclick="handleLogin()">Sign In</button>
+    <p id="loginError" style="color:var(--danger);margin-top:12px;display:none;"></p>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div class="dashboard" id="dashboardView">
+  <div class="topbar">
+    <h1>MyCamp Admin</h1>
+    <div class="user-info">
+      <span class="user-email" id="adminEmail"></span>
+      <button class="btn btn-logout btn-sm" onclick="handleLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Create User -->
+    <div class="card">
+      <h2>Create New User</h2>
+      <p style="color:var(--muted);font-size:13px;margin-top:-10px;margin-bottom:16px;">User will be required to change this password on first login.</p>
+      <div class="create-form">
+        <div class="form-group">
+          <label for="newEmail">Email</label>
+          <input type="email" id="newEmail" placeholder="user@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="newPassword">Initial Password</label>
+          <div style="position:relative;">
+            <input type="text" id="newPassword" placeholder="Min 6 characters" value="Welcome@321" style="padding-right:40px;" />
+            <button onclick="copyPassword()" title="Copy password" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted);">📋</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="newName">Full Name</label>
+          <input type="text" id="newName" placeholder="Enter full name" />
+        </div>
+        <div class="form-group">
+          <label for="newPhone">Phone Number</label>
+          <input type="tel" id="newPhone" placeholder="Enter phone number" />
+        </div>
+        <div class="form-group">
+          <label for="newBranch">Branch</label>
+          <input type="text" id="newBranch" placeholder="e.g. Computer Science" />
+        </div>
+        <div class="form-group">
+          <label for="newRole">Role</label>
+          <select id="newRole" onchange="toggleYearField()">
+            <option value="student">Student</option>
+            <option value="teacher">Teacher</option>
+            <option value="admin">Admin</option>
+            <option value="temp">Temp User</option>
+          </select>
+        </div>
+        <div class="form-group" id="yearGroup">
+          <label for="newYear">Year</label>
+          <select id="newYear">
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+          </select>
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end;">
+          <button class="btn btn-primary" id="createBtn" onclick="handleCreateUser()" style="width:100%;">Create User</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users List -->
+    <div class="card">
+      <h2>Users</h2>
+      <div class="search-filter-bar">
+        <input type="text" id="userSearch" placeholder="Search by name, email, phone..." oninput="filterUsers()" />
+        <select id="roleFilter" onchange="filterUsers()">
+          <option value="">All Roles</option>
+          <option value="student">Student</option>
+          <option value="teacher">Teacher</option>
+          <option value="admin">Admin</option>
+          <option value="temp">Temp User</option>
+        </select>
+      </div>
+      <div id="usersContainer">
+        <div class="empty-state">Loading users...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // ------------------------------------------------------------------
+  // Supabase client — reads config from env.js (generated at build/deploy)
+  // ------------------------------------------------------------------
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+  // Load config from env.js which sets window.__ENV__
+  // Fallback to placeholders if not set
+  const SUPABASE_URL = window.__ENV__?.SUPABASE_URL || 'YOUR_SUPABASE_URL_HERE';
+  const SUPABASE_ANON_KEY = window.__ENV__?.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY_HERE';
+  const SUPABASE_SERVICE_ROLE_KEY = window.__ENV__?.SUPABASE_SERVICE_ROLE_KEY || 'YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE';
+  const ADMIN_EMAIL = window.__ENV__?.ADMIN_EMAIL || 'admin@mycamp.app';
+
+  // Client for regular auth (login/logout)
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Admin client for user management (uses service_role key)
+  const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // ------------------------------------------------------------------
+  // Expose functions to global scope for onclick handlers
+  // ------------------------------------------------------------------
+  window.handleLogin = async function () {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+    const btn = document.getElementById('loginBtn');
+
+    errorEl.style.display = 'none';
+
+    if (!email || !password) {
+      errorEl.textContent = 'Please enter email and password.';
+      errorEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+
+      // Check admin role
+      const role = data.user?.user_metadata?.role;
+      if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase() && role !== 'admin') {
+        await supabase.auth.signOut();
+        throw new Error('Access denied. Admin account required.');
+      }
+
+      showDashboard(data.user);
+    } catch (err) {
+      errorEl.textContent = err.message || 'Login failed';
+      errorEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+    }
+  };
+
+  window.handleLogout = async function () {
+    await supabase.auth.signOut();
+    document.getElementById('dashboardView').classList.remove('active');
+    document.getElementById('loginView').classList.remove('hidden');
+  };
+
+  window.copyPassword = function () {
+    const pw = document.getElementById('newPassword').value;
+    if (pw) {
+      navigator.clipboard.writeText(pw);
+      showToast('Password copied', 'success');
+    }
+  };
+
+  window.toggleYearField = function () {
+    const role = document.getElementById('newRole').value;
+    const yearGroup = document.getElementById('yearGroup');
+    yearGroup.style.display = (role === 'student' || role === 'temp') ? '' : 'none';
+  };
+
+  window.handleCreateUser = async function () {
+    const email = document.getElementById('newEmail').value.trim();
+    const password = document.getElementById('newPassword').value;
+    const role = document.getElementById('newRole').value;
+    const name = document.getElementById('newName').value.trim();
+    const phone = document.getElementById('newPhone').value.trim();
+    const branch = document.getElementById('newBranch').value.trim();
+    const showYear = role === 'student' || role === 'temp';
+    const year = showYear ? document.getElementById('newYear').value : null;
+    const btn = document.getElementById('createBtn');
+
+    if (!email || !password) { showToast('Email and password are required', 'error'); return; }
+    if (password.length < 6) { showToast('Password must be at least 6 characters', 'error'); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    try {
+      const metadata = { role, must_change_password: true };
+      if (name) metadata.name = name;
+      if (phone) metadata.phone = phone;
+      if (branch) metadata.branch = branch;
+      if (year) metadata.year = year;
+
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        user_metadata: metadata,
+        email_confirm: true,
+      });
+      if (error) throw error;
+
+      showToast(`User ${email} created`, 'success');
+      document.getElementById('newEmail').value = '';
+      document.getElementById('newPassword').value = 'Welcome@321';
+      document.getElementById('newName').value = '';
+      document.getElementById('newPhone').value = '';
+      document.getElementById('newBranch').value = '';
+      document.getElementById('newRole').value = 'student';
+      document.getElementById('newYear').value = '1st Year';
+      toggleYearField();
+      await loadUsers();
+    } catch (err) {
+      showToast(err.message || 'Failed to create user', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Create User';
+    }
+  };
+
+  window.handleDeleteUser = async function (userId, userEmail) {
+    if (userEmail.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+      showToast('Cannot delete the primary admin account', 'error');
+      return;
+    }
+
+    if (!confirm(`Delete user ${userEmail}? This cannot be undone.`)) return;
+
+    try {
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (error) throw error;
+      showToast(`User ${userEmail} deleted`, 'success');
+      await loadUsers();
+    } catch (err) {
+      showToast(err.message || 'Failed to delete user', 'error');
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // Dashboard helpers
+  // ------------------------------------------------------------------
+  function showDashboard(user) {
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('dashboardView').classList.add('active');
+    document.getElementById('adminEmail').textContent = user.email;
+    loadUsers();
+  }
+
+  let _allUsers = [];
+
+  async function loadUsers() {
+    const container = document.getElementById('usersContainer');
+    container.innerHTML = '<div class="empty-state">Loading users...</div>';
+
+    try {
+      const { data: { users }, error } = await supabaseAdmin.auth.admin.listUsers();
+      if (error) throw error;
+
+      _allUsers = users || [];
+      renderUsers(_allUsers);
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load users: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  window.filterUsers = function () {
+    const search = (document.getElementById('userSearch').value || '').toLowerCase();
+    const roleFilter = document.getElementById('roleFilter').value;
+
+    let filtered = _allUsers;
+    if (roleFilter) {
+      filtered = filtered.filter(u => {
+        const isProtectedAdmin = u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+        const role = isProtectedAdmin ? 'admin' : (u.user_metadata?.role || 'student');
+        return role === roleFilter;
+      });
+    }
+    if (search) {
+      filtered = filtered.filter(u => {
+        const meta = u.user_metadata || {};
+        const hay = [u.email, meta.name, meta.phone, meta.branch, meta.year].filter(Boolean).join(' ').toLowerCase();
+        return hay.includes(search);
+      });
+    }
+    renderUsers(filtered);
+  };
+
+  function renderUsers(users) {
+    const container = document.getElementById('usersContainer');
+
+    if (!users || users.length === 0) {
+      container.innerHTML = '<div class="empty-state">No users found</div>';
+      return;
+    }
+
+    const roleClass = (r) => `role-${r || 'student'}`;
+
+    container.innerHTML = `
+      <div style="overflow-x:auto;">
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone</th>
+            <th>Role</th>
+            <th>Branch</th>
+            <th>Year</th>
+            <th>Pwd Changed</th>
+            <th>Last Sign In</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${users.map(u => {
+            const isProtectedAdmin = u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+            const meta = u.user_metadata || {};
+            const role = isProtectedAdmin ? 'admin' : (meta.role || 'student');
+            const name = meta.name || '—';
+            const phone = meta.phone || '—';
+            const branch = meta.branch || '—';
+            const year = meta.year || '—';
+            const mustChange = meta.must_change_password;
+            const pwdChanged = mustChange === true
+              ? '<span class="status-badge status-no">Pending</span>'
+              : '<span class="status-badge status-yes">Done</span>';
+            const lastSignIn = u.last_sign_in_at
+              ? new Date(u.last_sign_in_at).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+              : '—';
+            const created = new Date(u.created_at).toLocaleDateString();
+            return `
+              <tr>
+                <td>${escapeHtml(name)}</td>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${escapeHtml(phone)}</td>
+                <td><span class="role-badge ${roleClass(role)}">${escapeHtml(role)}</span></td>
+                <td>${escapeHtml(branch)}</td>
+                <td>${escapeHtml(year)}</td>
+                <td>${pwdChanged}</td>
+                <td>${lastSignIn}</td>
+                <td>${created}</td>
+                <td>
+                  ${isProtectedAdmin ? '' : `<button class="btn btn-danger btn-sm" onclick="handleDeleteUser('${u.id}', '${escapeHtml(u.email)}')">Delete</button>`}
+                </td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+      </div>
+    `;
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+  }
+
+  function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3500);
+  }
+
+  // ------------------------------------------------------------------
+  // Auto-restore session on page load
+  // ------------------------------------------------------------------
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      const role = session.user.user_metadata?.role;
+      const email = session.user.email?.toLowerCase();
+      if (email === ADMIN_EMAIL.toLowerCase() || role === 'admin') {
+        showDashboard(session.user);
+      }
+    }
+  })();
+</script>
+
+<!-- Environment config — replace values or load dynamically at deploy time -->
+<script src="env.js"></script>
+
+</body>
+</html>

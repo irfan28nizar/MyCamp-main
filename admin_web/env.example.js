@@ -1,0 +1,8 @@
+// EXAMPLE — copy this to env.js and fill in real values.
+// Do NOT commit env.js with real credentials.
+window.__ENV__ = {
+  SUPABASE_URL: 'YOUR_SUPABASE_URL_HERE',
+  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY_HERE',
+  SUPABASE_SERVICE_ROLE_KEY: 'YOUR_SUPABASE_SERVICE_ROLE_KEY_HERE',
+  ADMIN_EMAIL: 'admin@mycamp.app',
+};
