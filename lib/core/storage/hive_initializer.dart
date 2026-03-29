@@ -19,4 +19,3 @@ class HiveInitializer {
 }
 
 
-// Hello there 
