@@ -91,8 +91,12 @@ class _HomeMapScreenState extends State<HomeMapScreen>
             _mapTransformationController.value = animation.value;
           }
         });
-    _initializeNavigation();
-    _initializeLocationTracking();
+    _initializeNavigation().catchError((Object error) {
+      debugPrint('Error initializing navigation: $error');
+    });
+    _initializeLocationTracking().catchError((Object error) {
+      debugPrint('Error initializing location tracking: $error');
+    });
   }
 
   @override
@@ -253,6 +257,30 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     final startName = _startController.text.trim();
     final destinationName = _destinationController.text.trim();
 
+    if (_graphService == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Navigation data is still loading. Try again.'),
+        ),
+      );
+      return;
+    }
+
+    if (_nodesById.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Navigation data is still loading. Try again.'),
+        ),
+      );
+      return;
+    }
+
     final typedStartId = _placeNameToNodeId[startName.toLowerCase()];
     var startId = _useCurrentLocationAsStart
         ? null
@@ -269,18 +297,6 @@ class _HomeMapScreenState extends State<HomeMapScreen>
 
     debugPrint('START: name="$startName", nodeId=$startId');
     debugPrint('END: name="$destinationName", nodeId=$destinationId');
-
-    if (_graphService == null) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Navigation data is still loading. Try again.'),
-        ),
-      );
-      return;
-    }
 
     if (destinationId == null) {
       if (!mounted) {
