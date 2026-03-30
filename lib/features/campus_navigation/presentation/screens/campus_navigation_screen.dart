@@ -79,9 +79,7 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }
@@ -136,10 +134,7 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
     });
   }
 
-  void _onSuggestionTap({
-    required PlaceModel place,
-    required bool isStart,
-  }) {
+  void _onSuggestionTap({required PlaceModel place, required bool isStart}) {
     setState(() {
       if (isStart) {
         _startController.text = place.name;
@@ -160,7 +155,8 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
 
     final startId =
         _selectedStartNodeId ?? _placeNameToNodeId[startName.toLowerCase()];
-    final destinationId = _selectedDestinationNodeId ??
+    final destinationId =
+        _selectedDestinationNodeId ??
         _placeNameToNodeId[destinationName.toLowerCase()];
 
     debugPrint('START: name="$startName", nodeId=$startId');
@@ -188,7 +184,9 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No route found between selected places.')),
+        const SnackBar(
+          content: Text('No route found between selected places.'),
+        ),
       );
       return;
     }
@@ -272,16 +270,17 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
     }
 
     final isForward = edge.from == fromId && edge.to == toId;
-    final points =
-        (isForward ? edge.geometry : edge.geometry.reversed).toList(growable: false);
+    final points = (isForward ? edge.geometry : edge.geometry.reversed).toList(
+      growable: false,
+    );
     final pixels = points
-        .map((point) => _coordinateMapper.latLngToPixel(point.latitude, point.longitude))
+        .map(
+          (point) =>
+              _coordinateMapper.latLngToPixel(point.latitude, point.longitude),
+        )
         .toList(growable: false);
 
-    return _RouteSegmentResult(
-      latLngPoints: points,
-      pixels: pixels,
-    );
+    return _RouteSegmentResult(latLngPoints: points, pixels: pixels);
   }
 
   EdgeModel? _findEdgeForPair(int fromId, int toId) {
@@ -301,16 +300,23 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
   }
 
   void _logProjectionValidation(_RouteBuildResult routeBuild) {
-    final northWestPixel =
-        _coordinateMapper.latLngToPixel(_coordinateMapper.north, _coordinateMapper.west);
-    final southEastPixel =
-        _coordinateMapper.latLngToPixel(_coordinateMapper.south, _coordinateMapper.east);
+    final northWestPixel = _coordinateMapper.latLngToPixel(
+      _coordinateMapper.north,
+      _coordinateMapper.west,
+    );
+    final southEastPixel = _coordinateMapper.latLngToPixel(
+      _coordinateMapper.south,
+      _coordinateMapper.east,
+    );
 
-    final matchesTopLeft = northWestPixel.dx.abs() < _projectionEpsilon &&
+    final matchesTopLeft =
+        northWestPixel.dx.abs() < _projectionEpsilon &&
         northWestPixel.dy.abs() < _projectionEpsilon;
     final matchesBottomRight =
-        (southEastPixel.dx - _coordinateMapper.width).abs() < _projectionEpsilon &&
-            (southEastPixel.dy - _coordinateMapper.height).abs() < _projectionEpsilon;
+        (southEastPixel.dx - _coordinateMapper.width).abs() <
+            _projectionEpsilon &&
+        (southEastPixel.dy - _coordinateMapper.height).abs() <
+            _projectionEpsilon;
 
     debugPrint(
       'Map bounds: N=${_coordinateMapper.north}, S=${_coordinateMapper.south}, '
@@ -347,7 +353,7 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
     return Container(
       margin: const EdgeInsets.only(top: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(12),
       ),
       constraints: const BoxConstraints(maxHeight: 180),
@@ -376,125 +382,150 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              color: teal,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: FutureBuilder<String?>(
-                        future: _currentUserRoleFuture,
-                        builder: (context, snapshot) {
-                          final role = snapshot.data;
-                          final isAdmin = role == 'admin';
-                          if (role == null) {
-                            return const SizedBox(width: 48, height: 48);
-                          }
-
-                          return PopupMenuButton<String>(
-                            tooltip: 'Menu',
-                            icon: const Icon(Icons.more_vert, color: Colors.white),
-                            onSelected: (value) {
-                              if (value == 'admin_panel') {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const AdminScreen(),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              if (value == 'logout') {
-                                _handleLogout();
-                              }
-                            },
-                            itemBuilder: (_) => [
-                              if (isAdmin)
-                                const PopupMenuItem<String>(
-                                  value: 'admin_panel',
-                                  child: Text('Admin Panel'),
-                                ),
-                              const PopupMenuItem<String>(
-                                value: 'logout',
-                                child: Text('Logout'),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                    _SearchField(
-                      hintText: 'starting point...',
-                      controller: _startController,
-                      isActive: _isSelectingStart,
-                      onTap: () {
-                        setState(() {
-                          _isSelectingStart = true;
-                          _startSuggestions = _filterPlaces(_startController.text);
-                        });
-                      },
-                      onChanged: _onStartChanged,
-                    ),
-                    if (_isSelectingStart)
-                      _buildSuggestions(
-                        suggestions: _startSuggestions,
-                        isStart: true,
-                      ),
-                    const SizedBox(height: 10),
-                    _SearchField(
-                      hintText: 'where to...',
-                      controller: _destinationController,
-                      isActive: !_isSelectingStart,
-                      onTap: () {
-                        setState(() {
-                          _isSelectingStart = false;
-                          _destinationSuggestions =
-                              _filterPlaces(_destinationController.text);
-                        });
-                      },
-                      onChanged: _onDestinationChanged,
-                    ),
-                    if (!_isSelectingStart)
-                      _buildSuggestions(
-                        suggestions: _destinationSuggestions,
-                        isStart: false,
-                      ),
-                    const SizedBox(height: 14),
-                    Align(
-                      child: SizedBox(
-                        height: 36,
-                        child: ElevatedButton(
-                          onPressed: _handleStartPressed,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: teal,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                          ),
-                          child: const Text(
-                            'GO >>',
-                            style: TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                      ),
+            // Search container at top
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: teal,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: FutureBuilder<String?>(
+                          future: _currentUserRoleFuture,
+                          builder: (context, snapshot) {
+                            final role = snapshot.data;
+                            final isAdmin = role == 'admin';
+                            if (role == null) {
+                              return const SizedBox(width: 48, height: 48);
+                            }
+
+                            return PopupMenuButton<String>(
+                              tooltip: 'Menu',
+                              icon: const Icon(
+                                Icons.more_vert,
+                                color: Colors.white,
+                              ),
+                              onSelected: (value) {
+                                if (value == 'admin_panel') {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const AdminScreen(),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                if (value == 'logout') {
+                                  _handleLogout();
+                                }
+                              },
+                              itemBuilder: (_) => [
+                                if (isAdmin)
+                                  const PopupMenuItem<String>(
+                                    value: 'admin_panel',
+                                    child: Text('Admin Panel'),
+                                  ),
+                                const PopupMenuItem<String>(
+                                  value: 'logout',
+                                  child: Text('Logout'),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                      _SearchField(
+                        hintText: 'starting point...',
+                        controller: _startController,
+                        isActive: _isSelectingStart,
+                        onTap: () {
+                          setState(() {
+                            _isSelectingStart = true;
+                            _startSuggestions = _filterPlaces(
+                              _startController.text,
+                            );
+                          });
+                        },
+                        onChanged: _onStartChanged,
+                      ),
+                      if (_isSelectingStart)
+                        _buildSuggestions(
+                          suggestions: _startSuggestions,
+                          isStart: true,
+                        ),
+                      const SizedBox(height: 10),
+                      _SearchField(
+                        hintText: 'where to...',
+                        controller: _destinationController,
+                        isActive: !_isSelectingStart,
+                        onTap: () {
+                          setState(() {
+                            _isSelectingStart = false;
+                            _destinationSuggestions = _filterPlaces(
+                              _destinationController.text,
+                            );
+                          });
+                        },
+                        onChanged: _onDestinationChanged,
+                      ),
+                      if (!_isSelectingStart)
+                        _buildSuggestions(
+                          suggestions: _destinationSuggestions,
+                          isStart: false,
+                        ),
+                      const SizedBox(height: 12),
+                      Align(
+                        child: SizedBox(
+                          height: 36,
+                          child: ElevatedButton(
+                            onPressed: _handleStartPressed,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: teal,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                              ),
+                            ),
+                            child: const Text(
+                              'GO >>',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
+            // Map section fills remaining space
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final maxW = constraints.maxWidth;
                   final maxH = constraints.maxHeight;
-                  final imageAspect = _coordinateMapper.width / _coordinateMapper.height;
+                  final imageAspect =
+                      _coordinateMapper.width / _coordinateMapper.height;
                   late final double mapW;
                   late final double mapH;
 
@@ -508,10 +539,14 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
 
                   final scaleX = mapW / _coordinateMapper.width;
                   final scaleY = mapH / _coordinateMapper.height;
-                  final scaleLogKey = '${scaleX.toStringAsFixed(6)}:${scaleY.toStringAsFixed(6)}';
-                  if (_routePixels.length >= 2 && _lastScaleLogKey != scaleLogKey) {
+                  final scaleLogKey =
+                      '${scaleX.toStringAsFixed(6)}:${scaleY.toStringAsFixed(6)}';
+                  if (_routePixels.length >= 2 &&
+                      _lastScaleLogKey != scaleLogKey) {
                     _lastScaleLogKey = scaleLogKey;
-                    debugPrint('Calculated scaling ratios: scaleX=$scaleX, scaleY=$scaleY');
+                    debugPrint(
+                      'Calculated scaling ratios: scaleX=$scaleX, scaleY=$scaleY',
+                    );
                     if ((scaleX - scaleY).abs() <= 0.000001) {
                       debugPrint(
                         'Route polyline aligns with campus_map.png overlay using identical aspect scaling.',
@@ -519,37 +554,41 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
                     }
                   }
 
-                  final left = (maxW - mapW) / 2;
-                  final top = (maxH - mapH) / 2;
-
-                  return Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Container(color: const Color(0xFFE5E5E5)),
-                      ),
-                      Positioned(
-                        left: left,
-                        top: top,
-                        width: mapW,
-                        height: mapH,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            Image.asset(
-                              'assets/maps/campus_map.png',
-                              fit: BoxFit.contain,
-                            ),
-                            CustomPaint(
-                              painter: RoutePainter(
-                                routePixels: _routePixels,
-                                sourceWidth: _coordinateMapper.width,
-                                sourceHeight: _coordinateMapper.height,
+                  return Container(
+                    color: const Color(0xFFE5E5E5),
+                    child: InteractiveViewer(
+                      boundaryMargin: const EdgeInsets.all(100),
+                      minScale: 0.5,
+                      maxScale: 5.0,
+                      child: Center(
+                        child: Transform.scale(
+                          scale: 2.5,
+                          child: Stack(
+                            children: [
+                              Image.asset(
+                                'assets/maps/campus_map.png',
+                                width: _coordinateMapper.width.toDouble(),
+                                height: _coordinateMapper.height.toDouble(),
+                                fit: BoxFit.contain,
                               ),
-                            ),
-                          ],
+                              IgnorePointer(
+                                child: SizedBox(
+                                  width: _coordinateMapper.width.toDouble(),
+                                  height: _coordinateMapper.height.toDouble(),
+                                  child: CustomPaint(
+                                    painter: RoutePainter(
+                                      routePixels: _routePixels,
+                                      sourceWidth: _coordinateMapper.width,
+                                      sourceHeight: _coordinateMapper.height,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   );
                 },
               ),
@@ -562,10 +601,7 @@ class _CampusNavigationScreenState extends State<CampusNavigationScreen> {
 }
 
 class _RouteSegmentResult {
-  const _RouteSegmentResult({
-    required this.latLngPoints,
-    required this.pixels,
-  });
+  const _RouteSegmentResult({required this.latLngPoints, required this.pixels});
 
   final List<ll.LatLng> latLngPoints;
   final List<Offset> pixels;
@@ -604,8 +640,8 @@ class RoutePainter extends CustomPainter {
 
     final scaleX = size.width / sourceWidth;
     final scaleY = size.height / sourceHeight;
-    final path =
-        Path()..moveTo(routePixels.first.dx * scaleX, routePixels.first.dy * scaleY);
+    final path = Path()
+      ..moveTo(routePixels.first.dx * scaleX, routePixels.first.dy * scaleY);
 
     for (final point in routePixels.skip(1)) {
       path.lineTo(point.dx * scaleX, point.dy * scaleY);

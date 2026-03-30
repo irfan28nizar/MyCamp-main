@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mycamp_app/features/auth/data/repositories/supabase_auth_repository.dart';
+import 'package:mycamp_app/features/auth/presentation/screens/change_password_screen.dart';
 import 'package:mycamp_app/features/auth/presentation/screens/login_screen.dart';
 import 'package:mycamp_app/features/admin/presentation/screens/admin_screen.dart';
 
@@ -137,7 +138,12 @@ class ProfileScreen extends StatelessWidget {
                   label: 'Change Password',
                   icon: Icons.lock_outline,
                   onTap: () {
-                    // TODO: change password flow
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    );
                   },
                 ),
 

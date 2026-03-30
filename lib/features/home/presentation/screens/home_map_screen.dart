@@ -65,7 +65,6 @@ class _HomeMapScreenState extends State<HomeMapScreen>
   int? _selectedDestinationNodeId;
   bool _useCurrentLocationAsStart = true;
   bool _isSelectingStart = true;
-  String _travelMode = 'walk';
   StreamSubscription<Position>? _positionSubscription;
   Position? _latestPosition;
   double? _currentHeadingDegrees;
@@ -80,17 +79,18 @@ class _HomeMapScreenState extends State<HomeMapScreen>
   @override
   void initState() {
     super.initState();
-    _mapTransformationController = TransformationController();
-    _mapAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    )..addListener(() {
-        final animation = _mapMatrixAnimation;
-        if (animation != null) {
-          _mapTransformationController.value = animation.value;
-        }
-      });
-    _startController.text = _currentLocationLabel;
+    _mapTransformationController = TransformationController()
+      ..value = Matrix4.diagonal3Values(4.5, 4.5, 1.0);
+    _mapAnimationController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 420),
+        )..addListener(() {
+          final animation = _mapMatrixAnimation;
+          if (animation != null) {
+            _mapTransformationController.value = animation.value;
+          }
+        });
     _initializeNavigation();
     _initializeLocationTracking();
   }
@@ -133,25 +133,28 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       debugPrint('Unable to fetch current location.');
     }
 
-    _positionSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.bestForNavigation,
-        distanceFilter: 3,
-      ),
-    ).listen(
-      _onLivePosition,
-      onError: (Object error) {
-        debugPrint('Location stream error: $error');
-      },
-    );
+    _positionSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 3,
+          ),
+        ).listen(
+          _onLivePosition,
+          onError: (Object error) {
+            debugPrint('Location stream error: $error');
+          },
+        );
   }
 
   void _onLivePosition(Position position) {
     _latestPosition = position;
     final hasHeading = position.heading.isFinite && position.heading >= 0;
     _currentHeadingDegrees = hasHeading ? position.heading : null;
-    final rawPixel =
-        _coordinateMapper.latLngToPixel(position.latitude, position.longitude);
+    final rawPixel = _coordinateMapper.latLngToPixel(
+      position.latitude,
+      position.longitude,
+    );
     final snappedPixel = _routePixels.length >= 2
         ? _snapPointToRoute(rawPixel, _routePixels)
         : rawPixel;
@@ -190,10 +193,7 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     final nodes = _navigationDataService.nodes;
     final edges = _navigationDataService.edges;
     setState(() {
-      _graphService = GraphService(
-        nodes,
-        edges,
-      );
+      _graphService = GraphService(nodes, edges);
       _places = places;
       _edges = edges;
       _nodesById = {for (final node in nodes) node.id: node};
@@ -222,7 +222,6 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       _selectedStartNodeId = _placeNameToNodeId[normalized];
       _useCurrentLocationAsStart = isCurrentLocation;
       _startSuggestions = _filterPlaces(value);
-      _isSelectingStart = true;
     });
   }
 
@@ -231,14 +230,10 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     setState(() {
       _selectedDestinationNodeId = _placeNameToNodeId[normalized];
       _destinationSuggestions = _filterPlaces(value);
-      _isSelectingStart = false;
     });
   }
 
-  void _onSuggestionTap({
-    required PlaceModel place,
-    required bool isStart,
-  }) {
+  void _onSuggestionTap({required PlaceModel place, required bool isStart}) {
     setState(() {
       if (isStart) {
         _startController.text = place.name;
@@ -254,23 +249,16 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     });
   }
 
-  void _onCurrentLocationStartTap() {
-    setState(() {
-      _startController.text = _currentLocationLabel;
-      _selectedStartNodeId = null;
-      _useCurrentLocationAsStart = true;
-      _startSuggestions = const <PlaceModel>[];
-      _isSelectingStart = true;
-    });
-  }
-
   Future<void> _handleStartPressed() async {
     final startName = _startController.text.trim();
     final destinationName = _destinationController.text.trim();
 
     final typedStartId = _placeNameToNodeId[startName.toLowerCase()];
-    var startId = _useCurrentLocationAsStart ? null : _selectedStartNodeId ?? typedStartId;
-    final destinationId = _selectedDestinationNodeId ??
+    var startId = _useCurrentLocationAsStart
+        ? null
+        : _selectedStartNodeId ?? typedStartId;
+    final destinationId =
+        _selectedDestinationNodeId ??
         _placeNameToNodeId[destinationName.toLowerCase()];
     if (_useCurrentLocationAsStart && _latestPosition != null) {
       startId = _nearestNodeIdForLatLng(
@@ -287,7 +275,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Navigation data is still loading. Try again.')),
+        const SnackBar(
+          content: Text('Navigation data is still loading. Try again.'),
+        ),
       );
       return;
     }
@@ -317,15 +307,15 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     final pathNodeIds = _graphService!.findShortestPath(
       startId,
       destinationId,
-      _travelMode,
+      'walk',
     );
     debugPrint('PATH NODE IDS: $pathNodeIds');
 
     if (pathNodeIds.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No route found.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No route found.')));
       }
       setState(() {
         _routePixels = const <Offset>[];
@@ -350,7 +340,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Route geometry missing in edges data for this path.'),
+            content: Text(
+              'Route geometry missing in edges data for this path.',
+            ),
           ),
         );
       }
@@ -452,10 +444,8 @@ class _HomeMapScreenState extends State<HomeMapScreen>
 
     return points
         .map(
-          (point) => _coordinateMapper.latLngToPixel(
-            point.latitude,
-            point.longitude,
-          ),
+          (point) =>
+              _coordinateMapper.latLngToPixel(point.latitude, point.longitude),
         )
         .toList(growable: false);
   }
@@ -504,12 +494,18 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       return;
     }
 
-    final scale = math.min(
-      viewport.width / _coordinateMapper.width,
-      viewport.height / _coordinateMapper.height,
-    );
+    // Cover-style scale so the map fills the viewport (no empty bands).
+    final double scale = math
+        .max(
+          viewport.width / _coordinateMapper.width,
+          viewport.height / _coordinateMapper.height,
+        )
+        .clamp(_minMapScale, _maxMapScale)
+        .toDouble();
+
     final translateX = (viewport.width - (_coordinateMapper.width * scale)) / 2;
-    final translateY = (viewport.height - (_coordinateMapper.height * scale)) / 2;
+    final translateY =
+        (viewport.height - (_coordinateMapper.height * scale)) / 2;
 
     final matrix = Matrix4.identity()
       ..translateByDouble(translateX, translateY, 0, 1)
@@ -551,14 +547,17 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     debugPrint('computedScale: $computedScale');
     debugPrint('centerX, centerY: $centerX, $centerY');
 
+    final scale =
+        computedScale.clamp(_minMapScale, _maxMapScale).toDouble();
+
     final matrix = Matrix4.identity()
       ..translateByDouble(
-        (viewport.width / 2) - (centerX * computedScale),
-        (viewport.height / 2) - (centerY * computedScale),
+        (viewport.width / 2) - (centerX * scale),
+        (viewport.height / 2) - (centerY * scale),
         0,
         1,
       )
-      ..scaleByDouble(computedScale, computedScale, 1, 1);
+      ..scaleByDouble(scale, scale, 1, 1);
 
     _animateToMatrix(matrix, animated: animated);
   }
@@ -592,8 +591,11 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       return;
     }
 
-    final targetScale = (zoomIn ? currentScale * _zoomStep : currentScale / _zoomStep)
-        .clamp(_minMapScale, _maxMapScale);
+    final targetScale =
+        (zoomIn ? currentScale * _zoomStep : currentScale / _zoomStep).clamp(
+          _minMapScale,
+          _maxMapScale,
+        );
     if ((targetScale - currentScale).abs() < 0.000001) {
       return;
     }
@@ -671,7 +673,12 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     int? nearestNodeId;
     var nearestDistance = double.infinity;
     for (final node in _nodesById.values) {
-      final distance = _haversineMeters(latitude, longitude, node.lat, node.lng);
+      final distance = _haversineMeters(
+        latitude,
+        longitude,
+        node.lat,
+        node.lng,
+      );
       if (distance < nearestDistance) {
         nearestDistance = distance;
         nearestNodeId = node.id;
@@ -757,10 +764,7 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       );
       instructions.add(instruction);
       turnPoints.add(
-        _TurnPoint(
-          instructionIndex: instructions.length - 1,
-          pathNodeIndex: i,
-        ),
+        _TurnPoint(instructionIndex: instructions.length - 1, pathNodeIndex: i),
       );
       accumulatedDistance = 0.0;
     }
@@ -810,7 +814,12 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       if (node == null) {
         continue;
       }
-      final distance = _haversineMeters(latitude, longitude, node.lat, node.lng);
+      final distance = _haversineMeters(
+        latitude,
+        longitude,
+        node.lat,
+        node.lng,
+      );
       if (distance < nearestDistance) {
         nearestDistance = distance;
         nearestPathIndex = i;
@@ -858,7 +867,10 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     if (_activePathNodeIds.isEmpty) {
       return 0;
     }
-    final safeNearest = nearestPathIndex.clamp(0, _activePathNodeIds.length - 1);
+    final safeNearest = nearestPathIndex.clamp(
+      0,
+      _activePathNodeIds.length - 1,
+    );
     final safeTarget = targetPathIndex.clamp(0, _activePathNodeIds.length - 1);
     final nearestNode = _nodesById[_activePathNodeIds[safeNearest]];
     if (nearestNode == null) {
@@ -870,10 +882,20 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       if (targetNode == null) {
         return 0;
       }
-      return _haversineMeters(latitude, longitude, targetNode.lat, targetNode.lng);
+      return _haversineMeters(
+        latitude,
+        longitude,
+        targetNode.lat,
+        targetNode.lng,
+      );
     }
 
-    var distance = _haversineMeters(latitude, longitude, nearestNode.lat, nearestNode.lng);
+    var distance = _haversineMeters(
+      latitude,
+      longitude,
+      nearestNode.lat,
+      nearestNode.lng,
+    );
     for (var i = safeNearest; i < safeTarget; i++) {
       final from = _nodesById[_activePathNodeIds[i]];
       final to = _nodesById[_activePathNodeIds[i + 1]];
@@ -889,7 +911,8 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     const earthRadius = 6371000.0;
     final dLat = _toRadians(lat2 - lat1);
     final dLon = _toRadians(lon2 - lon1);
-    final a = math.pow(math.sin(dLat / 2), 2) +
+    final a =
+        math.pow(math.sin(dLat / 2), 2) +
         math.cos(_toRadians(lat1)) *
             math.cos(_toRadians(lat2)) *
             math.pow(math.sin(dLon / 2), 2);
@@ -904,7 +927,8 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     final phi2 = _toRadians(lat2);
     final dLon = _toRadians(lon2 - lon1);
     final y = math.sin(dLon) * math.cos(phi2);
-    final x = math.cos(phi1) * math.sin(phi2) -
+    final x =
+        math.cos(phi1) * math.sin(phi2) -
         math.sin(phi1) * math.cos(phi2) * math.cos(dLon);
     final bearing = math.atan2(y, x) * 180 / math.pi;
     return (bearing + 360) % 360;
@@ -953,8 +977,19 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     required List<PlaceModel> suggestions,
     required bool isStart,
   }) {
-    final hasCurrentLocationOption = isStart;
-    if (suggestions.isEmpty && !hasCurrentLocationOption) {
+    // For the "From" field, add "Current location" as first option
+    final allSuggestions = isStart
+        ? [
+            PlaceModel(
+              id: 'current_location',
+              nodeId: -1,
+              name: _currentLocationLabel,
+            ),
+            ...suggestions,
+          ]
+        : suggestions;
+
+    if (allSuggestions.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -976,10 +1011,13 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(vertical: 6),
         shrinkWrap: true,
-        itemCount: suggestions.length + (hasCurrentLocationOption ? 1 : 0),
+        itemCount: allSuggestions.length,
         separatorBuilder: (_, index) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          if (hasCurrentLocationOption && index == 0) {
+          final place = allSuggestions[index];
+
+          // Special styling for "Current location" option
+          if (isStart && place.name == _currentLocationLabel) {
             return ListTile(
               dense: true,
               leading: const Icon(Icons.my_location, color: _primaryTealDark),
@@ -991,16 +1029,17 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                 'Use your live GPS position',
                 style: TextStyle(fontSize: 12),
               ),
-              onTap: _onCurrentLocationStartTap,
+              onTap: () => _onSuggestionTap(place: place, isStart: isStart),
             );
           }
 
-          final place = suggestions[index - (hasCurrentLocationOption ? 1 : 0)];
           return ListTile(
             dense: true,
             leading: Icon(
               isStart ? Icons.trip_origin : Icons.location_on_outlined,
-              color: isStart ? const Color(0xFF1A8F97) : const Color(0xFF1967D2),
+              color: isStart
+                  ? const Color(0xFF1A8F97)
+                  : const Color(0xFF1967D2),
             ),
             title: Text(
               place.name,
@@ -1042,15 +1081,110 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     final destinationPixel = _selectedDestinationNodeId == null
         ? null
         : _pixelForNode(_selectedDestinationNodeId!);
-    final hasLiveLocation = _latestPosition != null;
 
     return SafeArea(
-      child: Stack(
+      child: Column(
         children: [
-          // Full map background
-          Positioned.fill(
+          // Search container at top
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xF8FFFFFF),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0x59FFFFFF)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x26000000),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _SearchField(
+                    hint: 'From...',
+                    icon: Icons.location_on_outlined,
+                    controller: _startController,
+                    onTap: () {
+                      setState(() {
+                        _isSelectingStart = true;
+                        _startSuggestions = _filterPlaces(
+                          _useCurrentLocationAsStart
+                              ? ''
+                              : _startController.text,
+                        );
+                      });
+                    },
+                    onChanged: _onStartChanged,
+                  ),
+                  if (_isSelectingStart)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 180),
+                      child: SingleChildScrollView(
+                        child: _buildSuggestions(
+                          suggestions: _startSuggestions,
+                          isStart: true,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    spacing: 8,
+                    children: [
+                      Expanded(
+                        child: _SearchField(
+                          hint: 'To',
+                          icon: Icons.search,
+                          controller: _destinationController,
+                          onTap: () {
+                            setState(() {
+                              _isSelectingStart = false;
+                              _destinationSuggestions = _filterPlaces(
+                                _destinationController.text,
+                              );
+                            });
+                          },
+                          onChanged: _onDestinationChanged,
+                        ),
+                      ),
+                      SizedBox(
+                        height: 44,
+                        width: 44,
+                        child: ElevatedButton.icon(
+                          onPressed: _handleStartPressed,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _primaryTeal,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          icon: const Icon(Icons.navigation_rounded, size: 18),
+                          label: const Text(''),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (!_isSelectingStart)
+                    _buildSuggestions(
+                      suggestions: _destinationSuggestions,
+                      isStart: false,
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Map section fills remaining space
+          Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   _onMapViewportChanged(constraints.biggest);
@@ -1062,7 +1196,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                           decoration: BoxDecoration(
                             color: const Color(0xFFDDE5EA),
                             borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: const Color(0xFFBFD0D8)),
+                            border: Border.all(
+                              color: const Color.fromARGB(255, 255, 255, 255),
+                            ),
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
@@ -1070,7 +1206,8 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                               children: [
                                 Positioned.fill(
                                   child: InteractiveViewer(
-                                    transformationController: _mapTransformationController,
+                                    transformationController:
+                                        _mapTransformationController,
                                     minScale: _minMapScale,
                                     maxScale: _maxMapScale,
                                     constrained: false,
@@ -1099,22 +1236,32 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                                               Image.asset(
                                                 'assets/maps/campus_map.png',
                                                 width: _coordinateMapper.width,
-                                                height: _coordinateMapper.height,
+                                                height:
+                                                    _coordinateMapper.height,
                                                 fit: BoxFit.fill,
                                               ),
                                               IgnorePointer(
                                                 child: SizedBox(
-                                                  width: _coordinateMapper.width,
-                                                  height: _coordinateMapper.height,
+                                                  width:
+                                                      _coordinateMapper.width,
+                                                  height:
+                                                      _coordinateMapper.height,
                                                   child: CustomPaint(
                                                     painter: RouteOverlayPainter(
                                                       routePixels: _routePixels,
                                                       startPixel: startPixel,
-                                                      destinationPixel: destinationPixel,
-                                                      currentPixel: _currentLocationPixel,
-                                                      headingDegrees: _currentHeadingDegrees,
-                                                      sourceWidth: _coordinateMapper.width,
-                                                      sourceHeight: _coordinateMapper.height,
+                                                      destinationPixel:
+                                                          destinationPixel,
+                                                      currentPixel:
+                                                          _currentLocationPixel,
+                                                      headingDegrees:
+                                                          _currentHeadingDegrees,
+                                                      sourceWidth:
+                                                          _coordinateMapper
+                                                              .width,
+                                                      sourceHeight:
+                                                          _coordinateMapper
+                                                              .height,
                                                     ),
                                                   ),
                                                 ),
@@ -1135,9 +1282,13 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.92),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.92,
+                                      ),
                                       borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: const Color(0xFFD6E0E6)),
+                                      border: Border.all(
+                                        color: const Color(0xFFD6E0E6),
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -1153,7 +1304,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          _followMeEnabled ? 'Follow enabled' : 'Manual explore',
+                                          _followMeEnabled
+                                              ? 'Follow enabled'
+                                              : 'Manual explore',
                                           style: const TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
@@ -1187,7 +1340,9 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                             ),
                             const SizedBox(height: 8),
                             _buildMapControlButton(
-                              tooltip: _followMeEnabled ? 'Disable follow' : 'Enable follow',
+                              tooltip: _followMeEnabled
+                                  ? 'Disable follow'
+                                  : 'Enable follow',
                               icon: _followMeEnabled
                                   ? Icons.my_location_rounded
                                   : Icons.location_searching_rounded,
@@ -1198,7 +1353,8 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                                 setState(() {
                                   _followMeEnabled = !_followMeEnabled;
                                 });
-                                if (_followMeEnabled && _currentLocationPixel != null) {
+                                if (_followMeEnabled &&
+                                    _currentLocationPixel != null) {
                                   _centerOnPixel(_currentLocationPixel!);
                                 }
                               },
@@ -1206,217 +1362,79 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                           ],
                         ),
                       ),
+                      // Route instructions overlay
+                      if (_routeInstructions.isNotEmpty &&
+                          _nextInstructionIndex >= 0 &&
+                          _nextInstructionIndex < _routeInstructions.length)
+                        Positioned(
+                          bottom: 20,
+                          left: 12,
+                          right: 12,
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: <Color>[
+                                  Color(0xFFE5F6FF),
+                                  Color(0xFFF5FAFF),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: const Color(0xFFC5E4FF),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _routeInstructions[_nextInstructionIndex]
+                                      .icon,
+                                  color: const Color(0xFF1A73E8),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _routeInstructions[_nextInstructionIndex]
+                                            .text,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _distanceToNextMeters == null
+                                            ? 'Updating distance...'
+                                            : 'In ${_formatDistance(_distanceToNextMeters!)}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      if (_distanceToDestinationMeters != null)
+                                        Text(
+                                          'Remaining ${_formatDistance(_distanceToDestinationMeters!)}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 },
               ),
             ),
           ),
-          // Floating search overlay
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
-              child: FractionallySizedBox(
-                widthFactor: 0.95,
-                child: Transform.scale(
-                  scale: 0.9,
-                  alignment: Alignment.topCenter,
-                  child: Container(
-                    // reduce height automatically via scaling
-                    decoration: BoxDecoration(
-                      color: const Color(0xF8FFFFFF),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0x59FFFFFF)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x26000000),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                      _SearchField(
-                        hint: 'From (current location)',
-                        icon: Icons.location_on_outlined,
-                        controller: _startController,
-                        onTap: () {
-                          setState(() {
-                            _isSelectingStart = true;
-                            _startSuggestions = _filterPlaces(
-                              _useCurrentLocationAsStart ? '' : _startController.text,
-                            );
-                          });
-                        },
-                        onChanged: _onStartChanged,
-                      ),
-                      if (_isSelectingStart)
-                        ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 180),
-                          child: SingleChildScrollView(
-                            child: _buildSuggestions(suggestions: _startSuggestions, isStart: true),
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      Row(
-                        spacing: 8,
-                        children: [
-                          Expanded(
-                            child: ChoiceChip(
-                              label: const Text('Walk', style: TextStyle(fontSize: 12)),
-                              avatar: const Icon(Icons.directions_walk, size: 16),
-                              selected: _travelMode == 'walk',
-                              selectedColor: const Color(0xFFD2F2F1),
-                              side: BorderSide(
-                                color: _travelMode == 'walk'
-                                    ? const Color(0xFF69BFC3)
-                                    : const Color(0xFFD7E2EA),
-                              ),
-                              labelStyle: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11,
-                                color: _travelMode == 'walk'
-                                    ? _primaryTealDark
-                                    : const Color(0xFF4A5560),
-                              ),
-                              onSelected: (_) {
-                                setState(() => _travelMode = 'walk');
-                              },
-                            ),
-                          ),
-                          Expanded(
-                            child: ChoiceChip(
-                              label: const Text('Drive', style: TextStyle(fontSize: 12)),
-                              avatar: const Icon(Icons.directions_car, size: 16),
-                              selected: _travelMode == 'drive',
-                              selectedColor: const Color(0xFFDDE8FF),
-                              side: BorderSide(
-                                color: _travelMode == 'drive'
-                                    ? const Color(0xFF9DB5F7)
-                                    : const Color(0xFFD7E2EA),
-                              ),
-                              labelStyle: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11,
-                                color: _travelMode == 'drive'
-                                    ? const Color(0xFF1F4EAE)
-                                    : const Color(0xFF4A5560),
-                              ),
-                              onSelected: (_) {
-                                setState(() => _travelMode = 'drive');
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        spacing: 8,
-                        children: [
-                          Expanded(
-                            child: _SearchField(
-                              hint: 'To',
-                              icon: Icons.search,
-                              controller: _destinationController,
-                              onTap: () {
-                                setState(() {
-                                  _isSelectingStart = false;
-                                  _destinationSuggestions =
-                                      _filterPlaces(_destinationController.text);
-                                });
-                              },
-                              onChanged: _onDestinationChanged,
-                            ),
-                          ),
-                          SizedBox(
-                            height: 44,
-                            width: 44,
-                            child: ElevatedButton.icon(
-                              onPressed: _handleStartPressed,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _primaryTeal,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: EdgeInsets.zero,
-                              ),
-                              icon: const Icon(Icons.navigation_rounded, size: 18),
-                              label: const Text(''),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (!_isSelectingStart)
-                        _buildSuggestions(
-                          suggestions: _destinationSuggestions,
-                          isStart: false,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          ),
-          if (_routeInstructions.isNotEmpty &&
-              _nextInstructionIndex >= 0 &&
-              _nextInstructionIndex < _routeInstructions.length)
-            Positioned(
-              bottom: 20,
-              left: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: <Color>[Color(0xFFE5F6FF), Color(0xFFF5FAFF)],
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFFC5E4FF)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _routeInstructions[_nextInstructionIndex].icon,
-                      color: const Color(0xFF1A73E8),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _routeInstructions[_nextInstructionIndex].text,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _distanceToNextMeters == null
-                                ? 'Updating distance...'
-                                : 'In ${_formatDistance(_distanceToNextMeters!)}',
-                            style: const TextStyle(fontSize: 12, color: Colors.black87),
-                          ),
-                          if (_distanceToDestinationMeters != null)
-                            Text(
-                              'Remaining ${_formatDistance(_distanceToDestinationMeters!)}',
-                              style: const TextStyle(fontSize: 12, color: Colors.black54),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
         ],
       ),
     );
@@ -1450,7 +1468,8 @@ class RouteOverlayPainter extends CustomPainter {
 
     final scaleX = size.width / sourceWidth;
     final scaleY = size.height / sourceHeight;
-    final path = Path()..moveTo(routePixels.first.dx * scaleX, routePixels.first.dy * scaleY);
+    final path = Path()
+      ..moveTo(routePixels.first.dx * scaleX, routePixels.first.dy * scaleY);
 
     for (final point in routePixels.skip(1)) {
       path.lineTo(point.dx * scaleX, point.dy * scaleY);
@@ -1630,17 +1649,17 @@ class _SearchField extends StatelessWidget {
         prefixIcon: Icon(icon, color: const Color(0xFF1A7C88)),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: Color(0xFFDCE4EA)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: Color(0xFF1DA0AA),
-            width: 1.4,
-          ),
+          borderSide: const BorderSide(color: Color(0xFF1DA0AA), width: 1.4),
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),

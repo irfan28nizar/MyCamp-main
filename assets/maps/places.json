@@ -1,9 +1,9 @@
 {
   "places":[
     {"id":"P1","name":"Main Gate","node_id":1},
-    {"id":"P2","name":"4W Parking","node_id":27},
+    {"id":"P2","name":"Ground","node_id":27},
     {"id":"P3","name":"2W Parking","node_id":26},
-    {"id":"P4","name":"Ground","node_id":28},
+    {"id":"P4","name":"4W Parking","node_id":28},
     {"id":"P5","name":"Administrative Block","node_id":5},
     {"id":"P6","name":"Canteen","node_id":12},
     {"id":"P7","name":"Library","node_id":13},
