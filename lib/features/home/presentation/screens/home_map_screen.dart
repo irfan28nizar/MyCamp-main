@@ -110,33 +110,42 @@ class _HomeMapScreenState extends State<HomeMapScreen>
   }
 
   Future<void> _initializeLocationTracking() async {
+    debugPrint('Location tracking initialization started...');
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
-      debugPrint('Location service is disabled.');
+      debugPrint('ERROR: Location service is disabled.');
       return;
     }
+    debugPrint('✓ Location service is enabled');
 
     var permission = await Geolocator.checkPermission();
+    debugPrint('Initial permission status: $permission');
     if (permission == LocationPermission.denied) {
+      debugPrint('Requesting location permission...');
       permission = await Geolocator.requestPermission();
+      debugPrint('Permission after request: $permission');
     }
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
-      debugPrint('Location permission denied.');
+      debugPrint('ERROR: Location permission denied or denied forever.');
       return;
     }
+    debugPrint('✓ Location permission granted');
 
     try {
+      debugPrint('Fetching current position...');
       final current = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.best,
         ),
       );
+      debugPrint('✓ Got current position: ${current.latitude}, ${current.longitude}');
       _onLivePosition(current);
-    } catch (_) {
-      debugPrint('Unable to fetch current location.');
+    } catch (e) {
+      debugPrint('ERROR fetching current location: $e');
     }
 
+    debugPrint('Starting position stream...');
     _positionSubscription =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
@@ -144,9 +153,12 @@ class _HomeMapScreenState extends State<HomeMapScreen>
             distanceFilter: 3,
           ),
         ).listen(
-          _onLivePosition,
+          (Position position) {
+            debugPrint('✓ Position update: ${position.latitude}, ${position.longitude}');
+            _onLivePosition(position);
+          },
           onError: (Object error) {
-            debugPrint('Location stream error: $error');
+            debugPrint('ERROR: Location stream error: $error');
           },
         );
   }
@@ -241,8 +253,14 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     setState(() {
       if (isStart) {
         _startController.text = place.name;
-        _selectedStartNodeId = place.nodeId;
-        _useCurrentLocationAsStart = false;
+        if (place.nodeId == -1) {
+          // Special case: "Current location" suggestion
+          _useCurrentLocationAsStart = true;
+          _selectedStartNodeId = null;
+        } else {
+          _useCurrentLocationAsStart = false;
+          _selectedStartNodeId = place.nodeId;
+        }
         _startSuggestions = const <PlaceModel>[];
       } else {
         _destinationController.text = place.name;
@@ -288,11 +306,15 @@ class _HomeMapScreenState extends State<HomeMapScreen>
     final destinationId =
         _selectedDestinationNodeId ??
         _placeNameToNodeId[destinationName.toLowerCase()];
+    
+    debugPrint('DEBUG: _useCurrentLocationAsStart=$_useCurrentLocationAsStart, _latestPosition=$_latestPosition');
+    
     if (_useCurrentLocationAsStart && _latestPosition != null) {
       startId = _nearestNodeIdForLatLng(
         _latestPosition!.latitude,
         _latestPosition!.longitude,
       );
+      debugPrint('DEBUG: Found nearest node=$startId');
     }
 
     debugPrint('START: name="$startName", nodeId=$startId');
@@ -312,10 +334,11 @@ class _HomeMapScreenState extends State<HomeMapScreen>
       if (!mounted) {
         return;
       }
+      final message = _useCurrentLocationAsStart 
+          ? 'Waiting for GPS location. Please wait a moment and try again.'
+          : 'Enable location or select a valid starting point.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enable location or select a valid starting point.'),
-        ),
+        SnackBar(content: Text(message)),
       );
       return;
     }
@@ -1385,7 +1408,7 @@ class _HomeMapScreenState extends State<HomeMapScreen>
                         Positioned(
                           bottom: 20,
                           left: 12,
-                          right: 12,
+                          right: 70,
                           child: Container(
                             padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
                             decoration: BoxDecoration(
