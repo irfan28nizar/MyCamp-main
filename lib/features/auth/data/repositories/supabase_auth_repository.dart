@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:mycamp_app/features/auth/domain/models/user.dart' as app;
 import 'package:mycamp_app/features/auth/domain/repositories/auth_repository.dart';
@@ -48,6 +49,52 @@ class SupabaseAuthRepository implements AuthRepository {
   @override
   Future<void> logout() async {
     await _client.auth.signOut();
+  }
+
+  /// Login with Google using Supabase OAuth.
+  Future<app.User?> loginWithGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn(
+        serverClientId: dotenv.env['GOOGLE_SERVER_CLIENT_ID'],
+      );
+
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        debugPrint('Google sign in cancelled by user.');
+        return null;
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final accessToken = googleAuth.accessToken;
+      final idToken = googleAuth.idToken;
+
+      if (accessToken == null || idToken == null) {
+        debugPrint('Failed to obtain Google tokens.');
+        return null;
+      }
+
+      debugPrint('Attempting Supabase Google sign-in...');
+      final response = await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      final supabaseUser = response.user;
+      if (supabaseUser == null) {
+        debugPrint('Supabase returned no user');
+        return null;
+      }
+
+      debugPrint('Google login successful: ${supabaseUser.email}');
+      return _toAppUser(supabaseUser);
+    } on AuthException catch (e) {
+      debugPrint('Google login failed: ${e.message}');
+      return null;
+    } catch (e) {
+      debugPrint('Google login error: $e');
+      return null;
+    }
   }
 
   @override
@@ -152,6 +199,21 @@ class SupabaseAuthRepository implements AuthRepository {
     } catch (e) {
       debugPrint('List users failed: $e');
       return [];
+    }
+  }
+
+  /// Sends a password reset email to the specified email address.
+  /// Returns true if the email was sent successfully.
+  Future<bool> resetPassword(String email) async {
+    try {
+      await _client.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: 'io.supabase.flutter://reset-callback/',
+      );
+      return true;
+    } on AuthException catch (e) {
+      debugPrint('Password reset failed: ${e.message}');
+      return false;
     }
   }
 

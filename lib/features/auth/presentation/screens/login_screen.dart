@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:mycamp_app/features/auth/data/repositories/supabase_auth_repository.dart';
 import 'package:mycamp_app/features/auth/presentation/screens/change_password_screen.dart';
+import 'package:mycamp_app/features/auth/presentation/screens/forgot_password_screen.dart';
 import 'package:mycamp_app/features/home/presentation/screens/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -61,6 +62,53 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Invalid email or password'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final user = await _authRepository.loginWithGoogle();
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (user != null) {
+        // Check if user must change their password (first login with Google)
+        if (_authRepository.mustChangePassword) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ChangePasswordScreen(),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const HomeScreen(),
+            ),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Google login failed. Try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      debugPrint('Google login error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Login error. Please try again.'),
+          backgroundColor: Colors.red,
         ),
       );
     }
@@ -311,9 +359,95 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           const SizedBox(height: 18),
 
+                          // 🔹 Divider with text
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  thickness: 1,
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                child: Text(
+                                  'OR',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  thickness: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          // 🔹 Google Login button
+                          SizedBox(
+                            height: 48,
+                            child: OutlinedButton.icon(
+                              onPressed: _isLoading ? null : _handleGoogleLogin,
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.5),
+                                  width: 1.5,
+                                ),
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.1),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                              ),
+                              icon: _isLoading
+                                  ? const SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.g_mobiledata,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                              label: const Text(
+                                'Sign in with Google',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 18),
+
                           // 🔹 Forgot password
                           TextButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
                             child: const Text(
                               'Forgot Password?',
                               style: TextStyle(
